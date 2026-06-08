@@ -127,4 +127,15 @@ public class GuiaController {
         List<GuiaDespacho> resultados = guiaRepository.findByTransportistaAndFechaEmisionBetween(transportista, inicioDia, finDia);
         return ResponseEntity.ok(resultados);
     }
+
+     @GetMapping("/guias/listar")
+    public ResponseEntity<?> listarArchivosS3() {
+        try {
+            List<String> archivos = guiaService.listarArchivos();
+            return ResponseEntity.ok(archivos);
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al listar archivos: " + e.getMessage());
+        }
+    }
 }

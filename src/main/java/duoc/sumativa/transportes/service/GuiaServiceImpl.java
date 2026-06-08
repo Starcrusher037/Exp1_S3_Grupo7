@@ -18,6 +18,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 public class GuiaServiceImpl implements GuiaService {
@@ -88,5 +89,19 @@ public class GuiaServiceImpl implements GuiaService {
         String periodo = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyM")); 
         String transportistaLimpio = transportista.replaceAll("\\s+", ""); 
         return String.format("%s/%s/%s", periodo, transportistaLimpio, nombreArchivoGuia);
+    }
+
+    @Override
+    public List<String> listarArchivos() throws IOException {
+        try {
+        // S3Template nos da una lista de objetos S3 Resource. 
+        // Usamos streams para extraer solo la "rutaS3" (Key) de cada uno.
+        return s3Template.listObjects(nombreBucket, "")
+                .stream()
+                .map(s3Resource -> s3Resource.getFilename()) // Extrae la ruta/nombre del archivo
+                .toList(); // Lo convierte en la List<String> que necesitas
+        } catch (Exception e) {
+            throw new IOException("Error al conectar con AWS S3 para listar los archivos: " + e.getMessage(), e);
+        }
     }
 }
