@@ -66,35 +66,50 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      # 10. DESPLIEGUE EN EC2
+      # 10. DESPLIEGUE EN EC2: Solución definitiva mediante archivo .env nativo
       - name: SSH commands to deploy
-        env:
-          # GitHub procesa los secretos aquí de forma segura
-          DB_USER: ${{ secrets.ORACLE_DB_USER }}
-          DB_PASS: ${{ secrets.ORACLE_DB_PASSWORD }}
         run: |
-          # Pasamos las variables directas al entorno de la sesión SSH
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} \
-            DB_USERNAME="$DB_USER" \
-            DB_PASSWORD="$DB_PASS" \
-            << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} << 'EOF'
             
-            # Limpiar contenedor previo
+            # 1. Limpiar cualquier contenedor colgado previo
             docker stop microservicio-transportes || true
             docker rm microservicio-transportes || true
             
-            # Lanzar contenedor usando las variables heredadas de forma segura
+            # 2. Descargar la última versión de tu imagen desde Docker Hub
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+            docker pull starcrusher037/microservicio-transportes:latest
+            
+            # 3. RECONSTRUCCIÓN DE ORACLE WALLET
+            mkdir -p ~/oracle_wallet
+            echo "${{ secrets.ORACLE_WALLET_BASE64 }}" | base64 --decode > ~/oracle_wallet/wallet.zip
+            unzip -j -o ~/oracle_wallet/wallet.zip -d ~/oracle_wallet/
+            sed -i 's|"?/network/admin"|"/app/wallet"|g' ~/oracle_wallet/sqlnet.ora
+            rm -f ~/oracle_wallet/wallet.zip
+            
+            # 4. REQUERIMIENTO EFS
+            sudo mkdir -p /mnt/efs/guias
+            sudo chmod 777 /mnt/efs/guias
+            
+            # 5. CREAR ARCHIVO .ENV SEGURO (Las comillas simples en 'EOF' evitan que se deforme la clave)
+            cat << 'ENV_EOF' > ~/.env_transportes
+          TNS_ADMIN_PATH=/app/wallet
+          DB_USERNAME=${{ secrets.ORACLE_DB_USER }}
+          DB_PASSWORD=${{ secrets.ORACLE_DB_PASSWORD }}
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_REGION=us-east-1
+          AWS_S3_BUCKET=mibucketduoc
+          RUTA_EFS=/app/efs_storage
+          ENV_EOF
+          
+            # 6. ARRANQUE AUTOMÁTICO USANDO EL ARCHIVO DE ENTORNO BLINDADO
             docker run -d --name microservicio-transportes -p 8080:8080 \
               -v ~/oracle_wallet:/app/wallet \
               -v /mnt/efs/guias:/app/efs_storage \
-              -e TNS_ADMIN_PATH="/app/wallet" \
-              -e DB_USERNAME="$DB_USERNAME" \
-              -e DB_PASSWORD="$DB_PASSWORD" \
-              -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
-              -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-              -e AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}" \
-              -e AWS_REGION="us-east-1" \
-              -e AWS_S3_BUCKET="mibucketduoc" \
-              -e RUTA_EFS="/app/efs_storage" \
+              --env-file ~/.env_transportes \
               starcrusher037/microservicio-transportes:latest
+              
+            # 7. Limpieza del archivo con credenciales por seguridad
+            rm -f ~/.env_transportes
           EOF
