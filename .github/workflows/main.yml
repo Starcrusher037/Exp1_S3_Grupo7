@@ -66,40 +66,53 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      # 10. DESPLIEGUE AUTOMÁTICO EN EC2: Conexión remota por SSH para actualizar el contenedor
+      # 10. DESPLIEGUE EN EC2: Mapeo seguro usando los nombres reales de tus GitHub Secrets
       - name: SSH commands to deploy
+        env:
+          # Aquí usamos los nombres reales que tienes guardados en GitHub Actions
+          SECRET_USER_BD: ${{ secrets.ORACLE_DB_USER }}
+          SECRET_PASS_BD: ${{ secrets.ORACLE_DB_PASSWORD }}
+          SECRET_AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          SECRET_AWS_SEC: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          SECRET_AWS_TOK: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} \
+            DB_USERNAME="$SECRET_USER_BD" \
+            DB_PASSWORD="$SECRET_PASS_BD" \
+            AWS_ACCESS_KEY_ID="$SECRET_AWS_KEY" \
+            AWS_SECRET_ACCESS_KEY="$SECRET_AWS_SEC" \
+            AWS_SESSION_TOKEN="$SECRET_AWS_TOK" \
+            << 'EOF'
             
-            # Autenticar la máquina EC2 en Docker Hub para descargar la nueva imagen
+            # Autenticar y descargar la última imagen en la EC2
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/microservicio-transportes:latest
             
-            # RECONSTRUCCIÓN DE ORACLE WALLET CLOUD: Descarga y decodifica las credenciales seguras de la BD Oracle
+            # RECONSTRUCCIÓN DE ORACLE WALLET CLOUD (Protegido por 'EOF')
             mkdir -p ~/oracle_wallet
             echo "${{ secrets.ORACLE_WALLET_BASE64 }}" | base64 --decode > ~/oracle_wallet/wallet.zip
             unzip -j -o ~/oracle_wallet/wallet.zip -d ~/oracle_wallet/
             sed -i 's|"?/network/admin"|"/app/wallet"|g' ~/oracle_wallet/sqlnet.ora
             rm -f ~/oracle_wallet/wallet.zip
             
-            # REQUERIMIENTO EFS: Crea el directorio físico en la EC2 donde se monta el almacenamiento AWS EFS
+            # REQUERIMIENTO EFS
             sudo mkdir -p /mnt/efs/guias
             sudo chmod 777 /mnt/efs/guias
             
-            # LIMPIEZA: Detiene y elimina el contenedor viejo si es que estaba corriendo para liberar el puerto 8080
+            # LIMPIEZA: Detener contenedor previo si existe
             docker stop microservicio-transportes || true
             docker rm microservicio-transportes || true
             
-            # ARRANQUE DE PRODUCCIÓN OPTIMIZADO (Ajustado a tus nuevas variables de application.properties)
+            # ARRANQUE: Inyección limpia de variables heredadas por SSH hacia el contenedor
             docker run -d --name microservicio-transportes -p 8080:8080 \
               -v ~/oracle_wallet:/app/wallet \
               -v /mnt/efs/guias:/app/efs_storage \
               -e TNS_ADMIN_PATH="/app/wallet" \
-              -e DB_USERNAME="${{ secrets.ORACLE_DB_USER }}" \
-              -e DB_PASSWORD="${{ secrets.ORACLE_DB_PASSWORD }}" \
-              -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
-              -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-              -e AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}" \
+              -e DB_USERNAME="$DB_USERNAME" \
+              -e DB_PASSWORD="$DB_PASSWORD" \
+              -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+              -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+              -e AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN" \
               -e AWS_REGION="us-east-1" \
               -e AWS_S3_BUCKET="mibucketduoc" \
               -e RUTA_EFS="/app/efs_storage" \
