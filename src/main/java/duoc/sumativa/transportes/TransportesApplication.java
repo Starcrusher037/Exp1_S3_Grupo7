@@ -10,5 +10,5 @@ public class TransportesApplication {
 		SpringApplication.run(TransportesApplication.class, args);
 	}
 
-	//app lista para despliegue final #10
+	//app lista para despliegue y coneccion a api gateway
 }
