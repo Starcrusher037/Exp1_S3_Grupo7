@@ -12,10 +12,16 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception{
-        http.authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
-        .oauth2ResourceServer((oauth2 -> oauth2.jwt(Customizer.withDefaults())));
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .authorizeHttpRequests(authorize -> authorize
+                // Permitimos el acceso total a la ruta de listar guías
+                .requestMatchers("/api/transportes/guias/listar").permitAll()
+                // Cualquier otra ruta sí o sí requerirá token
+                .anyRequest().authenticated()
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+            
         return http.build();
     }
-
 }
