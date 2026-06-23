@@ -10,5 +10,5 @@ public class TransportesApplication {
 		SpringApplication.run(TransportesApplication.class, args);
 	}
 
-	//app lista para despliegue y coneccion a api gateway
+	//pruebas de conecciona apiwateway
 }
