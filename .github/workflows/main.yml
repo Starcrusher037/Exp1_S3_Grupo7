@@ -66,7 +66,7 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      # 10. DESPLIEGUE EN EC2: Traspaso seguro de entorno a SSH sin deformación de caracteres
+      # 10. DESPLIEGUE EN EC2: Inyección directa en Docker Run (Inmune a fallos de formato)
       - name: SSH commands to deploy
         env:
           O_USER: ${{ secrets.ORACLE_DB_USER }}
@@ -83,7 +83,7 @@ jobs:
             docker stop microservicio-transportes || true
             docker rm microservicio-transportes || true
             
-            # 2. Descargar la última versión de tu imagen desde Docker Hub
+            # 2. Descargar la última versión de tu imagen
             docker pull starcrusher037/microservicio-transportes:latest
             
             # 3. RECONSTRUCCIÓN DE ORACLE WALLET
@@ -97,26 +97,18 @@ jobs:
             sudo mkdir -p /mnt/efs/guias
             sudo chmod 777 /mnt/efs/guias
             
-            # 5. CREACIÓN DEL ARCHIVO .ENV (Alineado y limpio gracias al guion en <<- )
-            cat <<- 'ENV_SPACE' > ~/.env_transportes
-              TNS_ADMIN_PATH=/app/wallet
-              DB_USERNAME=$O_USER
-              DB_PASSWORD=$O_PASS
-              AWS_ACCESS_KEY_ID=$A_KEY
-              AWS_SECRET_ACCESS_KEY=$A_SECRET
-              AWS_SESSION_TOKEN=$A_TOKEN
-              AWS_REGION=us-east-1
-              AWS_S3_BUCKET=mibucketduoc
-              RUTA_EFS=/app/efs_storage
-            ENV_SPACE
-
-            # 6. ARRANQUE DEL CONTENEDOR
+            # 5. ARRANQUE DIRECTO CON INYECCIÓN DE VARIABLES ENV
             docker run -d --name microservicio-transportes -p 8080:8080 \
               -v ~/oracle_wallet:/app/wallet \
               -v /mnt/efs/guias:/app/efs_storage \
-              --env-file ~/.env_transportes \
+              -e TNS_ADMIN_PATH="/app/wallet" \
+              -e DB_USERNAME="$O_USER" \
+              -e DB_PASSWORD="$O_PASS" \
+              -e AWS_ACCESS_KEY_ID="$A_KEY" \
+              -e AWS_SECRET_ACCESS_KEY="$A_SECRET" \
+              -e AWS_SESSION_TOKEN="$A_TOKEN" \
+              -e AWS_REGION="us-east-1" \
+              -e AWS_S3_BUCKET="mibucketduoc" \
+              -e RUTA_EFS="/app/efs_storage" \
               starcrusher037/microservicio-transportes:latest
-              
-            # 7. Limpieza por seguridad
-            rm -f ~/.env_transportes
           EOF
