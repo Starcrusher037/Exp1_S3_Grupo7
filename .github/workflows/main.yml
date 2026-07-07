@@ -74,6 +74,7 @@ jobs:
           AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          ORACLE_WALLET: ${{ secrets.ORACLE_WALLET_BASE64 }}
         run: |
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} << 'EOF'
             
@@ -86,7 +87,7 @@ jobs:
             
             # 3. RECONSTRUCCIÓN DE ORACLE WALLET
             mkdir -p ~/oracle_wallet
-            echo "${{ secrets.ORACLE_WALLET_BASE64 }}" | base64 --decode > ~/oracle_wallet/wallet.zip
+            echo "$ORACLE_WALLET" | base64 --decode > ~/oracle_wallet/wallet.zip
             unzip -j -o ~/oracle_wallet/wallet.zip -d ~/oracle_wallet/
             sed -i 's|"?/network/admin"|"/app/wallet"|g' ~/oracle_wallet/sqlnet.ora
             rm -f ~/oracle_wallet/wallet.zip
@@ -95,17 +96,20 @@ jobs:
             sudo mkdir -p /mnt/efs/guias
             sudo chmod 777 /mnt/efs/guias
             
-            # 5. CREAR ARCHIVO .ENV SEGURO MEDIANTE ECHOS (Inmune a fallos de indentación)
+            # 5. CREAR ARCHIVO .ENV SEGURO (Comillas simples evitan corrupción de caracteres)
             echo "TNS_ADMIN_PATH=/app/wallet" > ~/.env_transportes
-            echo "DB_USERNAME=$ORACLE_USER" >> ~/.env_transportes
-            echo "DB_PASSWORD=$ORACLE_PASS" >> ~/.env_transportes
-            echo "AWS_ACCESS_KEY_ID=$AWS_KEY" >> ~/.env_transportes
-            echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET" >> ~/.env_transportes
-            echo "AWS_SESSION_TOKEN=$AWS_TOKEN" >> ~/.env_transportes
+            echo "DB_USERNAME='$ORACLE_USER'" >> ~/.env_transportes
+            echo "DB_PASSWORD='$ORACLE_PASS'" >> ~/.env_transportes
+            echo "AWS_ACCESS_KEY_ID='$AWS_KEY'" >> ~/.env_transportes
+            echo "AWS_SECRET_ACCESS_KEY='$AWS_SECRET'" >> ~/.env_transportes
+            echo "AWS_SESSION_TOKEN='$AWS_TOKEN'" >> ~/.env_transportes
             echo "AWS_REGION=us-east-1" >> ~/.env_transportes
             echo "AWS_S3_BUCKET=mibucketduoc" >> ~/.env_transportes
             echo "RUTA_EFS=/app/efs_storage" >> ~/.env_transportes
             
+            # Limpiar comillas extras internas que Spring Boot pudiera recibir
+            sed -i "s/'//g" ~/.env_transportes
+
             # 6. ARRANQUE AUTOMÁTICO USANDO EL ARCHIVO DE ENTORNO BLINDADO
             docker run -d --name microservicio-transportes -p 8080:8080 \
               -v ~/oracle_wallet:/app/wallet \
