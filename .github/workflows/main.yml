@@ -97,8 +97,8 @@ jobs:
             sudo mkdir -p /mnt/efs/guias
             sudo chmod 777 /mnt/efs/guias
             
-            # 5. CREACIÓN DEL ARCHIVO .ENV (Heredoc tradicional protegido de caracteres especiales)
-            cat << ENV_SPACE > ~/.env_transportes
+            # 5. CREACIÓN DEL ARCHIVO .ENV (Alineado y limpio gracias al guion en <<- )
+            cat <<- 'ENV_SPACE' > ~/.env_transportes
               TNS_ADMIN_PATH=/app/wallet
               DB_USERNAME=$O_USER
               DB_PASSWORD=$O_PASS
@@ -108,7 +108,7 @@ jobs:
               AWS_REGION=us-east-1
               AWS_S3_BUCKET=mibucketduoc
               RUTA_EFS=/app/efs_storage
-              ENV_SPACE
+            ENV_SPACE
 
             # 6. ARRANQUE DEL CONTENEDOR
             docker run -d --name microservicio-transportes -p 8080:8080 \
