@@ -69,7 +69,7 @@ jobs:
       # 10. DESPLIEGUE EN EC2: Solución definitiva mediante archivo .env nativo
       - name: SSH commands to deploy
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} << EOF
             
             # 1. Limpiar cualquier contenedor colgado previo
             docker stop microservicio-transportes || true
@@ -90,19 +90,19 @@ jobs:
             sudo mkdir -p /mnt/efs/guias
             sudo chmod 777 /mnt/efs/guias
             
-            # 5. CREAR ARCHIVO .ENV SEGURO (Las comillas simples en 'EOF' evitan que se deforme la clave)
-            cat << 'ENV_EOF' > ~/.env_transportes
-          TNS_ADMIN_PATH=/app/wallet
-          DB_USERNAME=${{ secrets.ORACLE_DB_USER }}
-          DB_PASSWORD=${{ secrets.ORACLE_DB_PASSWORD }}
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
-          AWS_REGION=us-east-1
-          AWS_S3_BUCKET=mibucketduoc
-          RUTA_EFS=/app/efs_storage
-          ENV_EOF
-          
+            # 5. CREAR ARCHIVO .ENV SEGURO
+            cat << ENV_EOF > ~/.env_transportes
+            TNS_ADMIN_PATH=/app/wallet
+            DB_USERNAME=${{ secrets.ORACLE_DB_USER }}
+            DB_PASSWORD=${{ secrets.ORACLE_DB_PASSWORD }}
+            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
+            AWS_REGION=us-east-1
+            AWS_S3_BUCKET=mibucketduoc
+            RUTA_EFS=/app/efs_storage
+            ENV_EOF
+            
             # 6. ARRANQUE AUTOMÁTICO USANDO EL ARCHIVO DE ENTORNO BLINDADO
             docker run -d --name microservicio-transportes -p 8080:8080 \
               -v ~/oracle_wallet:/app/wallet \
