@@ -68,15 +68,23 @@ jobs:
 
       # 10. DESPLIEGUE EN EC2: Solución definitiva mediante archivo .env nativo
       - name: SSH commands to deploy
+        env:
+          ORACLE_USER: ${{ secrets.ORACLE_DB_USER }}
+          ORACLE_PASS: ${{ secrets.ORACLE_DB_PASSWORD }}
+          AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKER_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} << EOF
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} << 'EOF'
             
             # 1. Limpiar cualquier contenedor colgado previo
             docker stop microservicio-transportes || true
             docker rm microservicio-transportes || true
             
             # 2. Descargar la última versión de tu imagen desde Docker Hub
-            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+            echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USER" --password-stdin
             docker pull starcrusher037/microservicio-transportes:latest
             
             # 3. RECONSTRUCCIÓN DE ORACLE WALLET
@@ -93,11 +101,11 @@ jobs:
             # 5. CREAR ARCHIVO .ENV SEGURO
             cat << ENV_EOF > ~/.env_transportes
             TNS_ADMIN_PATH=/app/wallet
-            DB_USERNAME=${{ secrets.ORACLE_DB_USER }}
-            DB_PASSWORD=${{ secrets.ORACLE_DB_PASSWORD }}
-            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
+            DB_USERNAME=$ORACLE_USER
+            DB_PASSWORD=$ORACLE_PASS
+            AWS_ACCESS_KEY_ID=$AWS_KEY
+            AWS_SECRET_ACCESS_KEY=$AWS_SECRET
+            AWS_SESSION_TOKEN=$AWS_TOKEN
             AWS_REGION=us-east-1
             AWS_S3_BUCKET=mibucketduoc
             RUTA_EFS=/app/efs_storage
