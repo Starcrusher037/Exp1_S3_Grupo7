@@ -74,8 +74,6 @@ jobs:
           AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKER_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} << 'EOF'
             
@@ -84,7 +82,6 @@ jobs:
             docker rm microservicio-transportes || true
             
             # 2. Descargar la última versión de tu imagen desde Docker Hub
-            echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USER" --password-stdin
             docker pull starcrusher037/microservicio-transportes:latest
             
             # 3. RECONSTRUCCIÓN DE ORACLE WALLET
@@ -98,18 +95,16 @@ jobs:
             sudo mkdir -p /mnt/efs/guias
             sudo chmod 777 /mnt/efs/guias
             
-            # 5. CREAR ARCHIVO .ENV SEGURO
-            cat << ENV_EOF > ~/.env_transportes
-            TNS_ADMIN_PATH=/app/wallet
-            DB_USERNAME=$ORACLE_USER
-            DB_PASSWORD=$ORACLE_PASS
-            AWS_ACCESS_KEY_ID=$AWS_KEY
-            AWS_SECRET_ACCESS_KEY=$AWS_SECRET
-            AWS_SESSION_TOKEN=$AWS_TOKEN
-            AWS_REGION=us-east-1
-            AWS_S3_BUCKET=mibucketduoc
-            RUTA_EFS=/app/efs_storage
-            ENV_EOF
+            # 5. CREAR ARCHIVO .ENV SEGURO MEDIANTE ECHOS (Inmune a fallos de indentación)
+            echo "TNS_ADMIN_PATH=/app/wallet" > ~/.env_transportes
+            echo "DB_USERNAME=$ORACLE_USER" >> ~/.env_transportes
+            echo "DB_PASSWORD=$ORACLE_PASS" >> ~/.env_transportes
+            echo "AWS_ACCESS_KEY_ID=$AWS_KEY" >> ~/.env_transportes
+            echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET" >> ~/.env_transportes
+            echo "AWS_SESSION_TOKEN=$AWS_TOKEN" >> ~/.env_transportes
+            echo "AWS_REGION=us-east-1" >> ~/.env_transportes
+            echo "AWS_S3_BUCKET=mibucketduoc" >> ~/.env_transportes
+            echo "RUTA_EFS=/app/efs_storage" >> ~/.env_transportes
             
             # 6. ARRANQUE AUTOMÁTICO USANDO EL ARCHIVO DE ENTORNO BLINDADO
             docker run -d --name microservicio-transportes -p 8080:8080 \
