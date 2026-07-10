@@ -10,5 +10,5 @@ public class TransportesApplication {
 		SpringApplication.run(TransportesApplication.class, args);
 	}
 
-	//pruebas de conecciona apiwatewaysd
+	//pruebas 
 }
