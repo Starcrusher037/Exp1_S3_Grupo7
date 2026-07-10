@@ -68,37 +68,37 @@ jobs:
 
       # 10. DESPLIEGUE EN EC2: Inyección directa en Docker Run (Inmune a fallos de formato)
       - name: SSH commands to deploy
-        env:
-          O_USER: ${{ secrets.ORACLE_DB_USER }}
-          O_PASS: ${{ secrets.ORACLE_DB_PASSWORD }}
-          A_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          A_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          A_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-          O_WALLET: ${{ secrets.ORACLE_WALLET_BASE64 }}
-          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} \
-            O_USER="$O_USER" O_PASS="$O_PASS" A_KEY="$A_KEY" A_SECRET="$A_SECRET" A_TOKEN="$A_TOKEN" O_WALLET="$O_WALLET" DOCKER_USER="$DOCKER_USER" 'bash -s' << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} 'bash -s' << 'EOF'
             
-            # 1. Limpiar cualquier contenedor colgado previo
+            # 1. Definir variables directamente en el entorno de ejecución remoto
+            O_USER="${{ secrets.ORACLE_DB_USER }}"
+            O_PASS="${{ secrets.ORACLE_DB_PASSWORD }}"
+            A_KEY="${{ secrets.AWS_ACCESS_KEY_ID }}"
+            A_SECRET="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+            A_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}"
+            O_WALLET="${{ secrets.ORACLE_WALLET_BASE64 }}"
+            DOCKER_USER="${{ secrets.DOCKERHUB_USERNAME }}"
+            
+            # 2. Limpiar cualquier contenedor colgado previo
             docker stop microservicio-transportes || true
             docker rm microservicio-transportes || true
             
-            # 2. Descargar la última versión de tu imagen usando el usuario correcto
+            # 3. Descargar la última versión de tu imagen
             docker pull "${DOCKER_USER}/microservicio-transportes:latest"
             
-            # 3. RECONSTRUCCIÓN DE ORACLE WALLET
+            # 4. RECONSTRUCCIÓN DE ORACLE WALLET
             mkdir -p ~/oracle_wallet
             echo "$O_WALLET" | base64 --decode > ~/oracle_wallet/wallet.zip
             unzip -j -o ~/oracle_wallet/wallet.zip -d ~/oracle_wallet/
             sed -i 's|"?/network/admin"|"/app/wallet"|g' ~/oracle_wallet/sqlnet.ora
             rm -f ~/oracle_wallet/wallet.zip
             
-            # 4. REQUERIMIENTO EFS
+            # 5. REQUERIMIENTO EFS
             sudo mkdir -p /mnt/efs/guias
             sudo chmod 777 /mnt/efs/guias
             
-            # 5. ARRANQUE DIRECTO CON ENCAPSULADO DE COMILLAS PARA EVITAR ERRORES DE CARACTERES EN CLAVES
+            # 6. ARRANQUE DIRECTO CON INYECCIÓN DE VARIABLES
             docker run -d --name microservicio-transportes -p 8080:8080 \
               -v ~/oracle_wallet:/app/wallet \
               -v /mnt/efs/guias:/app/efs_storage \
