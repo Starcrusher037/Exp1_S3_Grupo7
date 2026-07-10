@@ -75,16 +75,17 @@ jobs:
           A_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           A_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
           O_WALLET: ${{ secrets.ORACLE_WALLET_BASE64 }}
+          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} \
-            O_USER="$O_USER" O_PASS="$O_PASS" A_KEY="$A_KEY" A_SECRET="$A_SECRET" A_TOKEN="$A_TOKEN" O_WALLET="$O_WALLET" 'bash -s' << 'EOF'
+            O_USER="$O_USER" O_PASS="$O_PASS" A_KEY="$A_KEY" A_SECRET="$A_SECRET" A_TOKEN="$A_TOKEN" O_WALLET="$O_WALLET" DOCKER_USER="$DOCKER_USER" 'bash -s' << 'EOF'
             
             # 1. Limpiar cualquier contenedor colgado previo
             docker stop microservicio-transportes || true
             docker rm microservicio-transportes || true
             
-            # 2. Descargar la última versión de tu imagen
-            docker pull starcrusher037/microservicio-transportes:latest
+            # 2. Descargar la última versión de tu imagen usando el usuario correcto
+            docker pull "${DOCKER_USER}/microservicio-transportes:latest"
             
             # 3. RECONSTRUCCIÓN DE ORACLE WALLET
             mkdir -p ~/oracle_wallet
@@ -97,18 +98,18 @@ jobs:
             sudo mkdir -p /mnt/efs/guias
             sudo chmod 777 /mnt/efs/guias
             
-            # 5. ARRANQUE DIRECTO CON INYECCIÓN DE VARIABLES ENV
+            # 5. ARRANQUE DIRECTO CON ENCAPSULADO DE COMILLAS PARA EVITAR ERRORES DE CARACTERES EN CLAVES
             docker run -d --name microservicio-transportes -p 8080:8080 \
               -v ~/oracle_wallet:/app/wallet \
               -v /mnt/efs/guias:/app/efs_storage \
               -e TNS_ADMIN_PATH="/app/wallet" \
-              -e DB_USERNAME="$O_USER" \
-              -e DB_PASSWORD="$O_PASS" \
-              -e AWS_ACCESS_KEY_ID="$A_KEY" \
-              -e AWS_SECRET_ACCESS_KEY="$A_SECRET" \
-              -e AWS_SESSION_TOKEN="$A_TOKEN" \
+              -e DB_USERNAME="${O_USER}" \
+              -e DB_PASSWORD="${O_PASS}" \
+              -e AWS_ACCESS_KEY_ID="${A_KEY}" \
+              -e AWS_SECRET_ACCESS_KEY="${A_SECRET}" \
+              -e AWS_SESSION_TOKEN="${A_TOKEN}" \
               -e AWS_REGION="us-east-1" \
               -e AWS_S3_BUCKET="mibucketduoc" \
               -e RUTA_EFS="/app/efs_storage" \
-              starcrusher037/microservicio-transportes:latest
+              "${DOCKER_USER}/microservicio-transportes:latest"
           EOF
